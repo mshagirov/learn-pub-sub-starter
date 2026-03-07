@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 )
 
 func main() {
@@ -19,11 +20,18 @@ func main() {
 
 	fmt.Println("Peril server established connection to RabbitMQ")
 
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
+	pubCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("could not create AMQP message channel: %v", err)
+	}
+	if err := pubsub.PublishJSON(
+		pubCh,
+		routing.ExchangePerilDirect,
+		routing.PauseKey,
+		routing.PlayingState{IsPaused: true},
+	); err != nil {
+		log.Fatalf("couldn't publish PauseKey: %v", err)
+	}
 
-	fmt.Println("Program running. Press Ctrl+C to exit gracefully.")
-	<-signalChan
-
-	fmt.Println("RabbitMQ connection is closed")
+	fmt.Println("Pause message sent!")
 }
