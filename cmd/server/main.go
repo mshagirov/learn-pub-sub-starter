@@ -6,8 +6,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 )
 
 func main() {
@@ -18,20 +17,27 @@ func main() {
 	}
 	defer conn.Close()
 
-	fmt.Println("Peril server established connection to RabbitMQ")
+	gamelogic.PrintServerHelp()
+outerLoop:
+	for {
+		words := gamelogic.GetInput()
+		//* help
+		if len(words) < 1 {
+			continue
+		}
 
-	pubCh, err := conn.Channel()
-	if err != nil {
-		log.Fatalf("could not create AMQP message channel: %v", err)
+		switch words[0] {
+		case "pause":
+			publishPauseKey(conn, true)
+			fmt.Println("Pause message sent!")
+		case "resume":
+			publishPauseKey(conn, false)
+			fmt.Println("Resume message sent!")
+		case "quit":
+			fmt.Println("Stopping the server")
+			break outerLoop
+		default:
+			fmt.Printf("Unknown command: %s\n", words[0])
+		}
 	}
-	if err := pubsub.PublishJSON(
-		pubCh,
-		routing.ExchangePerilDirect,
-		routing.PauseKey,
-		routing.PlayingState{IsPaused: true},
-	); err != nil {
-		log.Fatalf("couldn't publish PauseKey: %v", err)
-	}
-
-	fmt.Println("Pause message sent!")
 }
