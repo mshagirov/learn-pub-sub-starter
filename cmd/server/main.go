@@ -17,6 +17,12 @@ func main() {
 	}
 	defer conn.Close()
 
+	gameLogCh, _, err := DeclareGameLogsQueue(conn)
+	if err != nil {
+		log.Fatalf("Error declaring GameLog queue: %v\n", err)
+	}
+	defer gameLogCh.Close()
+
 	gamelogic.PrintServerHelp()
 outerLoop:
 	for {

@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"log"
 
-	"os"
-	"os/signal"
-
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
@@ -28,23 +25,74 @@ func main() {
 		log.Fatalf("error loggin in: %v", err)
 	}
 
-	qCh, q, err := pubsub.DeclareAndBind(
+	if len(username) == 0 {
+		log.Fatalln("Username can't be empty")
+	}
+
+	gs := gamelogic.NewGameState(username)
+
+	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilDirect,
 		fmt.Sprintf("%v.%s", routing.PauseKey, username),
 		routing.PauseKey,
 		pubsub.TransientQueue,
+		handlerPause(gs),
 	)
 	if err != nil {
-		log.Fatalf("could not declare and bind queue channel: %v", err)
+		log.Fatalf("couldn't subscribe to the Pause queue: %v", err)
+	}
+	// pauseCh, _, err := pubsub.DeclareAndBind(
+	// 	conn,
+	// 	routing.ExchangePerilDirect,
+	// 	fmt.Sprintf("%v.%s", routing.PauseKey, username),
+	// 	routing.PauseKey,
+	// 	pubsub.TransientQueue,
+	// )
+	// if err != nil {
+	// 	log.Fatalf("could not declare and bind Pause queue: %v", err)
+	// }
+	// defer pauseCh.Close()
+
+outerLoop:
+	for {
+		words := gamelogic.GetInput()
+		//* help
+		if len(words) < 1 {
+			continue
+		}
+
+		switch words[0] {
+		case "spawn":
+			if err := gs.CommandSpawn(words); err != nil {
+				fmt.Println(err)
+			}
+		case "move":
+			mv, err := gs.CommandMove(words)
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				fmt.Printf("%v: moved %v units to %v\n",
+					mv.Player.Username, len(mv.Units), mv.ToLocation)
+			}
+		case "status":
+			gs.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			fmt.Println("Spamming not allowed yet!")
+		case "quit":
+			gamelogic.PrintQuit()
+			break outerLoop
+		default:
+			fmt.Printf("Unknown command: %s\n", words[0])
+		}
 	}
 
-	fmt.Println(qCh, q)
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt)
-	fmt.Println("Program running. Press Ctrl+C to exit gracefully.")
-	<-signals
+	// signals := make(chan os.Signal, 1)
+	// signal.Notify(signals, os.Interrupt)
+	// fmt.Println("Program running. Press Ctrl+C to exit gracefully.")
+	// <-signals
 
 	fmt.Println("Peril client closed")
 }
