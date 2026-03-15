@@ -42,22 +42,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("couldn't subscribe to the Pause queue: %v", err)
 	}
-	// pauseCh, _, err := pubsub.DeclareAndBind(
-	// 	conn,
-	// 	routing.ExchangePerilDirect,
-	// 	fmt.Sprintf("%v.%s", routing.PauseKey, username),
-	// 	routing.PauseKey,
-	// 	pubsub.TransientQueue,
-	// )
-	// if err != nil {
-	// 	log.Fatalf("could not declare and bind Pause queue: %v", err)
-	// }
-	// defer pauseCh.Close()
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, username),
+		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),
+		pubsub.TransientQueue,
+		handlerMove(gs),
+	)
+	if err != nil {
+		log.Fatalf("couldn't subscribe to the Army Move queue: %v", err)
+	}
 
 outerLoop:
 	for {
 		words := gamelogic.GetInput()
-		//* help
 		if len(words) < 1 {
 			continue
 		}
@@ -72,8 +71,7 @@ outerLoop:
 			if err != nil {
 				fmt.Println(err)
 			} else {
-				fmt.Printf("%v: moved %v units to %v\n",
-					mv.Player.Username, len(mv.Units), mv.ToLocation)
+				publishMove(conn, mv)
 			}
 		case "status":
 			gs.CommandStatus()
@@ -93,6 +91,4 @@ outerLoop:
 	// signal.Notify(signals, os.Interrupt)
 	// fmt.Println("Program running. Press Ctrl+C to exit gracefully.")
 	// <-signals
-
-	fmt.Println("Peril client closed")
 }
