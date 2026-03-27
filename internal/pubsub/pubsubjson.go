@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"encoding/json"
+	"log"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -29,7 +30,7 @@ func SubscribeJSON[T any](
 	conn *amqp.Connection,
 	exchange, queueName, key string,
 	queueType SimpleQueueType,
-	handler func(T),
+	handler func(T) Acktype,
 ) error {
 	ch, q, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -47,8 +48,18 @@ func SubscribeJSON[T any](
 			if err := json.Unmarshal(d.Body, &msg); err != nil {
 				continue
 			}
-			handler(msg)
-			d.Ack(false)
+			ack := handler(msg)
+			switch ack {
+			case Ack:
+				d.Ack(false)
+				log.Println("Ack: processed successfully")
+			case NackRequeue:
+				d.Nack(false, true)
+				log.Println("NackRequeue: couldn't process; requeued")
+			case NackDiscard:
+				d.Nack(false, false)
+				log.Println("NackDiscard: couldn't process; discarded")
+			}
 		}
 	}()
 

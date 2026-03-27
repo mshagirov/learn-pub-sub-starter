@@ -20,14 +20,15 @@ func DeclareAndBind(
 	if err != nil {
 		return nil, amqp.Queue{}, err
 	}
-
+	args := make(amqp.Table)
+	args["x-dead-letter-exchange"] = "peril_dlx"
 	queue, err := queueCh.QueueDeclare(
 		queueName,
 		queueType == DurableQueue,   //durable bool,
 		queueType == TransientQueue, //autodelete
 		queueType == TransientQueue, // exclusive
 		false,                       // noWait
-		nil,                         // args
+		args,
 	)
 	if err != nil {
 		return nil, amqp.Queue{}, err

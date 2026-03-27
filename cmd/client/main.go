@@ -40,18 +40,36 @@ func main() {
 		handlerPause(gs),
 	)
 	if err != nil {
-		log.Fatalf("couldn't subscribe to the Pause queue: %v", err)
+		log.Fatalf("client couldn't subscribe to the Pause queue: %v", err)
 	}
+
+	topicCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("client couldn't open topic channel: %v", err)
+	}
+	defer topicCh.Close()
 	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilTopic,
 		fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, username),
 		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),
 		pubsub.TransientQueue,
-		handlerMove(gs),
+		handlerMove(gs, topicCh),
 	)
 	if err != nil {
 		log.Fatalf("couldn't subscribe to the Army Move queue: %v", err)
+	}
+
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		"war",
+		fmt.Sprintf("%s.*", routing.WarRecognitionsPrefix),
+		pubsub.DurableQueue,
+		handlerWar(gs),
+	)
+	if err != nil {
+		log.Fatalf("couldn't subscribe to the War queue: %v", err)
 	}
 
 outerLoop:
