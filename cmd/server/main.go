@@ -7,6 +7,8 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 )
 
 func main() {
@@ -22,6 +24,19 @@ func main() {
 		log.Fatalf("Error declaring GameLog queue: %v\n", err)
 	}
 	defer gameLogCh.Close()
+
+	err = pubsub.Subscribe(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		fmt.Sprintf("%s.*", routing.GameLogSlug),
+		pubsub.DurableQueue,
+		handlerLog(),
+		pubsub.UnmarshallGob,
+	)
+	if err != nil {
+		log.Fatalf("client couldn't subscribe to the Logs queue: %v", err)
+	}
 
 	gamelogic.PrintServerHelp()
 outerLoop:

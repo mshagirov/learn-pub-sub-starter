@@ -31,13 +31,14 @@ func main() {
 
 	gs := gamelogic.NewGameState(username)
 
-	err = pubsub.SubscribeJSON(
+	err = pubsub.Subscribe(
 		conn,
 		routing.ExchangePerilDirect,
 		fmt.Sprintf("%v.%s", routing.PauseKey, username),
 		routing.PauseKey,
 		pubsub.TransientQueue,
 		handlerPause(gs),
+		pubsub.UnmarshallJson,
 	)
 	if err != nil {
 		log.Fatalf("client couldn't subscribe to the Pause queue: %v", err)
@@ -48,25 +49,27 @@ func main() {
 		log.Fatalf("client couldn't open topic channel: %v", err)
 	}
 	defer topicCh.Close()
-	err = pubsub.SubscribeJSON(
+	err = pubsub.Subscribe(
 		conn,
 		routing.ExchangePerilTopic,
 		fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, username),
 		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),
 		pubsub.TransientQueue,
 		handlerMove(gs, topicCh),
+		pubsub.UnmarshallJson,
 	)
 	if err != nil {
 		log.Fatalf("couldn't subscribe to the Army Move queue: %v", err)
 	}
 
-	err = pubsub.SubscribeJSON(
+	err = pubsub.Subscribe(
 		conn,
 		routing.ExchangePerilTopic,
 		"war",
 		fmt.Sprintf("%s.*", routing.WarRecognitionsPrefix),
 		pubsub.DurableQueue,
-		handlerWar(gs),
+		handlerWar(gs, topicCh),
+		pubsub.UnmarshallJson,
 	)
 	if err != nil {
 		log.Fatalf("couldn't subscribe to the War queue: %v", err)

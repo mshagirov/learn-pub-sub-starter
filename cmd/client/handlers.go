@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
@@ -18,21 +19,54 @@ func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) pubsub.Ack
 	}
 }
 
-func handlerWar(gs *gamelogic.GameState) func(gamelogic.RecognitionOfWar) pubsub.Acktype {
+func handlerWar(
+	gs *gamelogic.GameState,
+	topicCh *amqp.Channel,
+) func(gamelogic.RecognitionOfWar) pubsub.Acktype {
+	username := gs.GetUsername()
+
+	routingKey := fmt.Sprintf("%s.%s", routing.GameLogSlug, username)
+
+	pubGameLog := func(logMsg string) error {
+		gl := routing.GameLog{
+			Username:    username,
+			CurrentTime: time.Now(),
+			Message:     logMsg,
+		}
+
+		return pubsub.PublishGob(topicCh,
+			routing.ExchangePerilTopic,
+			routingKey,
+			gl)
+	}
+
 	return func(rw gamelogic.RecognitionOfWar) pubsub.Acktype {
 		defer fmt.Print("> ")
-		// outcome WarOutcome, winner string, loser string
-		outcome, _, _ := gs.HandleWar(rw)
+		outcome, winner, loser := gs.HandleWar(rw)
+		var logMsg string
 		switch outcome {
 		case gamelogic.WarOutcomeNotInvolved:
 			return pubsub.NackRequeue
 		case gamelogic.WarOutcomeNoUnits:
 			return pubsub.NackDiscard
 		case gamelogic.WarOutcomeOpponentWon:
+			logMsg = fmt.Sprintf("%s won a war against %s", winner, loser)
+			if err := pubGameLog(logMsg); err != nil {
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		case gamelogic.WarOutcomeYouWon:
+			logMsg = fmt.Sprintf("%s won a war against %s", winner, loser)
+			if err := pubGameLog(logMsg); err != nil {
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		case gamelogic.WarOutcomeDraw:
+			logMsg = fmt.Sprintf("A war between %s and %s resulted in a draw",
+				winner, loser)
+			if err := pubGameLog(logMsg); err != nil {
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		default:
 			fmt.Println("[Error] war outcome not recognised:", outcome)
