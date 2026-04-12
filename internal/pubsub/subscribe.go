@@ -132,6 +132,10 @@ func Subscribe[T any](
 		return err
 	}
 
+	if err := ch.Qos(10, 0, false); err != nil {
+		return err
+	}
+
 	deliveriesChannel, err := ch.Consume(q.Name, "", false, false, false, false, nil)
 	if err != nil {
 		return err
