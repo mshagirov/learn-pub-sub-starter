@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
@@ -99,7 +100,20 @@ outerLoop:
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":
-			fmt.Println("Spamming not allowed yet!")
+			if len(words) < 2 {
+				fmt.Printf("Error: spam amount not provided!\n\tE.g.spam 5\n")
+				continue
+			}
+			spamNum, err := strconv.Atoi(words[1])
+			if err != nil {
+				fmt.Printf("Error: converting %v to integer\n", words[1])
+				continue
+			}
+			for range spamNum {
+				spamMsg := gamelogic.GetMaliciousLog()
+				publishLog(conn, gs.GetUsername(), spamMsg)
+			}
+			fmt.Printf("Published %d logs\n", spamNum)
 		case "quit":
 			gamelogic.PrintQuit()
 			break outerLoop
